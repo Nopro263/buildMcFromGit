@@ -1,0 +1,9 @@
+plugin1:
+  build:
+    access_token: "access"
+    organisation: "Nopro263"
+    repository: "buildMcFromGit"
+    branch: "master"
+  allow_op: false
+  allowed_players:
+    - Nopro263
