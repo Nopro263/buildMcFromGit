@@ -1,0 +1,5 @@
+name: buildMcFromGit
+version: '${project.version}'
+main: dev.nopro263.buildmcfromgit.Main
+api-version: '1.20'
+authors: [Nopro263]
