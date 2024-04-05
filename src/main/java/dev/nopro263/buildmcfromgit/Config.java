@@ -1,14 +1,32 @@
 package dev.nopro263.buildmcfromgit;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.maven.shared.invoker.*;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.InvalidDescriptionException;
+import org.bukkit.plugin.InvalidPluginException;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginLoader;
+import org.yaml.snakeyaml.reader.StreamReader;
 
-import java.io.File;
+import java.io.*;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.LogRecord;
 import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Config {
     private YamlConfiguration configuration;
@@ -50,7 +68,7 @@ public class Config {
         if(!build.contains("branch")) throw new NoSuchFieldException("String 'branch' not found");
         String branch = build.getString("branch");
 
-        return new Plugin(allow_op, allowed_players, access_token, organisation, repository, branch);
+        return new Plugin(name, allow_op, allowed_players, access_token, organisation, repository, branch);
     }
 
     public List<Plugin> getPlugin() {
@@ -64,8 +82,10 @@ public class Config {
         private String organisation;
         private String repo;
         private String branch;
+        private String name;
 
-        public Plugin(boolean allow_op, List<String> allowed_players, String access_token, String organisation, String repo, String branch) {
+        public Plugin(String name, boolean allow_op, List<String> allowed_players, String access_token, String organisation, String repo, String branch) {
+            this.name = name;
             this.allow_op = allow_op;
             this.allowed_players = allowed_players;
             this.access_token = access_token;
@@ -74,8 +94,92 @@ public class Config {
             this.branch = branch;
         }
 
-        public void build() {
+        private File _build(File result) throws IOException {
+            String current_directory = "/tmp/buildMcFromGit";
+            String compressed_file = current_directory + "/latest.tar.gz";
 
+            File cd = new File(current_directory);
+            if(!cd.exists()) {
+                cd.mkdirs();
+            }
+
+            URL website = new URL(String.format("https://api.github.com/repos/%s/%s/tarball/%s", this.organisation, this.repo, this.branch));
+            URLConnection urlConnection = website.openConnection();
+
+            if(this.access_token != null && !this.access_token.isEmpty()) {
+                urlConnection.setRequestProperty("Authorization", "token " + this.access_token);
+            }
+
+            ReadableByteChannel rbc = Channels.newChannel(urlConnection.getInputStream());
+            FileOutputStream fos = new FileOutputStream(compressed_file);
+            fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+
+            try {
+                decompress(compressed_file, cd);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            File[] files = cd.listFiles(new Filter());
+
+            if(files == null || files.length == 0) {
+                throw new RuntimeException("No file found");
+            }
+            File file = files[0];
+
+            InvocationRequest request = new DefaultInvocationRequest();
+            request.setQuiet(true);
+            request.setPomFile( new File( file.getAbsolutePath() + "/pom.xml" ) );
+            request.setGoals( Arrays.asList( "package" ) );
+
+            Invoker invoker = new DefaultInvoker();
+            try {
+                invoker.execute( request );
+            } catch (MavenInvocationException e) {
+                throw new RuntimeException(e);
+            }
+
+            File target = new File(file, "target");
+            files = target.listFiles(new ResultFilter());
+            if(files == null || files.length == 0) {
+                throw new RuntimeException("No file found");
+            }
+            file = files[0];
+
+            System.out.println(file.getAbsolutePath());
+            Path resultCopy = Files.copy(file.toPath(), new File(result, file.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+            FileUtils.deleteDirectory(cd);
+
+            return resultCopy.toFile();
+        }
+
+        private void decompress(String compressed_file, File directory) throws InterruptedException, IOException {
+            String[] args = {"tar", "xz", "-f", compressed_file};
+            ProcessBuilder processBuilder = new ProcessBuilder(args);
+            processBuilder.directory(directory);
+            Process p = processBuilder.start();
+            p.waitFor();
+        }
+
+        public void build(File data_dir, PluginLoader loader) throws InvalidPluginException, InvalidDescriptionException {
+            File f = null;
+            try {
+                f = this._build(data_dir.getParentFile());
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            String name = loader.getPluginDescription(f).getName();
+
+            for(org.bukkit.plugin.Plugin p:Bukkit.getPluginManager().getPlugins()) {
+                if(p.getName().equals(name)) {
+                    Bukkit.getPluginManager().disablePlugin(p);
+                }
+            }
+
+            org.bukkit.plugin.Plugin plugin = Bukkit.getPluginManager().loadPlugin(f);
+            plugin.onLoad();
+            Bukkit.getPluginManager().enablePlugin(plugin);
         }
 
         public boolean canBuild(String player, boolean isOp) {
@@ -83,6 +187,31 @@ public class Config {
             if(this.allow_op && isOp) return true;
 
             return false;
+        }
+
+        public String getName() {
+            return this.name;
+        }
+
+        private class Filter implements FilenameFilter {
+
+            @Override
+            public boolean accept(File file, String s) {
+                Pattern pattern = Pattern.compile("^[^-]+-[^-]+-[0-9a-f]+$", Pattern.CASE_INSENSITIVE);
+                Matcher matcher = pattern.matcher(s);
+                return matcher.find();
+            }
+        }
+
+        private class ResultFilter implements FilenameFilter {
+
+            @Override
+            public boolean accept(File file, String s) {
+                if(new File(file, s).isDirectory()) return false;
+                Pattern pattern = Pattern.compile("^(?!original).*$", Pattern.CASE_INSENSITIVE);
+                Matcher matcher = pattern.matcher(s);
+                return matcher.find();
+            }
         }
     }
 }

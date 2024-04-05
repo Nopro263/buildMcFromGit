@@ -1,5 +1,8 @@
 package dev.nopro263.buildmcfromgit;
 
+import org.bukkit.plugin.InvalidDescriptionException;
+import org.bukkit.plugin.InvalidPluginException;
+import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
@@ -39,6 +42,18 @@ public final class Main extends JavaPlugin {
             fillDefaultFile(f);
         }
         config = new Config(f);
+
+        for (Config.Plugin plugin:config.getPlugin()) {
+            System.out.println(plugin.getName());
+        }
+
+        try {
+            config.getPlugin().get(0).build(getDataFolder(), getPluginLoader());
+        } catch (InvalidPluginException e) {
+            throw new RuntimeException(e);
+        } catch (InvalidDescriptionException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public Config getPluginConfig() {
