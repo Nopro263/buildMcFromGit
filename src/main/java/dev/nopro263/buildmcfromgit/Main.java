@@ -1,5 +1,7 @@
 package dev.nopro263.buildmcfromgit;
 
+import dev.nopro263.buildmcfromgit.command.GitBuild;
+import dev.nopro263.buildmcfromgit.complete.GitBuildTab;
 import org.bukkit.plugin.InvalidDescriptionException;
 import org.bukkit.plugin.InvalidPluginException;
 import org.bukkit.plugin.PluginLoader;
@@ -41,22 +43,10 @@ public final class Main extends JavaPlugin {
             f.createNewFile();
             fillDefaultFile(f);
         }
-        config = new Config(f);
-
-        for (Config.Plugin plugin:config.getPlugin()) {
-            System.out.println(plugin.getName());
-        }
-
-        try {
-            config.getPlugin().get(0).build(getDataFolder(), getPluginLoader());
-        } catch (InvalidPluginException e) {
-            throw new RuntimeException(e);
-        } catch (InvalidDescriptionException e) {
-            throw new RuntimeException(e);
-        }
+        config = new Config(f, getDataFolder(), getPluginLoader());
     }
 
-    public Config getPluginConfig() {
+    public static Config getPluginConfig() {
         return config;
     }
 
@@ -67,6 +57,9 @@ public final class Main extends JavaPlugin {
         } catch (IOException ex) {
             System.err.println("Error in loading plugins: " + ex);
         }
+
+        getCommand("gitbuild").setExecutor(new GitBuild());
+        getCommand("gitbuild").setTabCompleter(new GitBuildTab());
     }
 
     @Override

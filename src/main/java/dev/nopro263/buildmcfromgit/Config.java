@@ -12,6 +12,7 @@ import org.bukkit.plugin.PluginLoader;
 import org.yaml.snakeyaml.reader.StreamReader;
 
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
@@ -23,6 +24,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.logging.LogRecord;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
@@ -31,9 +33,13 @@ import java.util.regex.Pattern;
 public class Config {
     private YamlConfiguration configuration;
     private List<Plugin> plugin;
-    public Config(File file) {
+    private File data_folder;
+    private PluginLoader loader;
+    public Config(File file, File data_folder, PluginLoader loader) {
         this.configuration = YamlConfiguration.loadConfiguration(file);
         this.plugin = new ArrayList<>();
+        this.data_folder = data_folder;
+        this.loader = loader;
 
         for(String plugin:this.configuration.getKeys(false)) {
             try {
@@ -75,6 +81,24 @@ public class Config {
         return this.plugin;
     }
 
+    public boolean isPluginContained(String name) {
+        for (Plugin p:this.plugin) {
+            if(Objects.equals(p.name, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public Plugin getPlugin(String name) {
+        for (Plugin p:this.plugin) {
+            if(Objects.equals(p.name, name)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
     public class Plugin {
         private boolean allow_op;
         private List<String> allowed_players;
@@ -111,6 +135,9 @@ public class Config {
             }
 
             ReadableByteChannel rbc = Channels.newChannel(urlConnection.getInputStream());
+            if(((HttpURLConnection) urlConnection).getResponseCode() != 200) {
+                throw new RuntimeException("non 200 code received (" + ((HttpURLConnection) urlConnection).getResponseCode() + ")");
+            }
             FileOutputStream fos = new FileOutputStream(compressed_file);
             fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
 
@@ -161,7 +188,9 @@ public class Config {
             p.waitFor();
         }
 
-        public void build(File data_dir, PluginLoader loader) throws InvalidPluginException, InvalidDescriptionException {
+        public void build() throws InvalidPluginException, InvalidDescriptionException {
+            File data_dir = Config.this.data_folder;
+            PluginLoader loader = Config.this.loader;
             File f = null;
             try {
                 f = this._build(data_dir.getParentFile());
@@ -197,7 +226,7 @@ public class Config {
 
             @Override
             public boolean accept(File file, String s) {
-                Pattern pattern = Pattern.compile("^[^-]+-[^-]+-[0-9a-f]+$", Pattern.CASE_INSENSITIVE);
+                Pattern pattern = Pattern.compile("^.+?-.+?-[0-9a-f]+$", Pattern.CASE_INSENSITIVE);
                 Matcher matcher = pattern.matcher(s);
                 return matcher.find();
             }
