@@ -203,6 +203,7 @@ public class Config {
             for(org.bukkit.plugin.Plugin p:Bukkit.getPluginManager().getPlugins()) {
                 if(p.getName().equals(name)) {
                     Bukkit.getPluginManager().disablePlugin(p);
+                    PluginUtils.unload(p);
                 }
             }
 
