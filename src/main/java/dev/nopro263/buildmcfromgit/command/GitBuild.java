@@ -10,6 +10,7 @@ import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.InvalidDescriptionException;
 import org.bukkit.plugin.InvalidPluginException;
+import org.bukkit.scheduler.BukkitRunnable;
 
 public class GitBuild implements CommandExecutor {
     @Override
@@ -27,14 +28,20 @@ public class GitBuild implements CommandExecutor {
         }
 
         if(canBuild) {
-            try {
-                plugin.build(commandSender);
-                commandSender.sendMessage(ChatColor.GREEN + "Built '" + strings[0] + "' successfully");
-            } catch (InvalidPluginException | InvalidDescriptionException | RuntimeException e) {
-                commandSender.sendMessage(ChatColor.RED + "Building '" + strings[0] + "' failed:");
-                commandSender.sendMessage(e.getMessage());
-                e.printStackTrace();
-            }
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    try {
+                        commandSender.sendMessage(ChatColor.GRAY + "Building '" + strings[0] + "'");
+                        plugin.build(commandSender);
+                        commandSender.sendMessage(ChatColor.GREEN + "Built '" + strings[0] + "' successfully");
+                    } catch (InvalidPluginException | InvalidDescriptionException | RuntimeException e) {
+                        commandSender.sendMessage(ChatColor.RED + "Building '" + strings[0] + "' failed:");
+                        commandSender.sendMessage(e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+            }.runTaskAsynchronously(Main.getInstance());
         } else {
             commandSender.sendMessage(ChatColor.RED + "You are not allowed to build this");
         }

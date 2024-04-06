@@ -12,6 +12,7 @@ import java.nio.file.Files;
 
 public final class Main extends JavaPlugin {
     private static Config config;
+    private static Main instance;
 
     private void fillDefaultFile(File file) throws IOException {
         OutputStream stream = Files.newOutputStream(file.toPath());
@@ -49,7 +50,12 @@ public final class Main extends JavaPlugin {
     public static Config getPluginConfig() {
         return config;
     }
+    public static Main getInstance() {return instance;}
 
+    @Override
+    public void onLoad() {
+        instance = this;
+    }
     @Override
     public void onEnable() {
         try {

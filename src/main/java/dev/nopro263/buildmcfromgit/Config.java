@@ -11,6 +11,7 @@ import org.bukkit.plugin.InvalidDescriptionException;
 import org.bukkit.plugin.InvalidPluginException;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginLoader;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.yaml.snakeyaml.reader.StreamReader;
 
 import java.io.*;
@@ -209,18 +210,37 @@ public class Config {
                 throw new RuntimeException(ex);
             }
 
-            String name = loader.getPluginDescription(f).getName();
+            File finalF = f;
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    String name = null;
+                    try {
+                        name = loader.getPluginDescription(finalF).getName();
+                    } catch (InvalidDescriptionException e) {
+                        throw new RuntimeException(e);
+                    }
 
-            for(org.bukkit.plugin.Plugin p:Bukkit.getPluginManager().getPlugins()) {
-                if(p.getName().equals(name)) {
-                    Bukkit.getPluginManager().disablePlugin(p);
-                    PluginUtils.unload(p);
+                    for(org.bukkit.plugin.Plugin p:Bukkit.getPluginManager().getPlugins()) {
+                        if(p.getName().equals(name)) {
+                            Bukkit.getPluginManager().disablePlugin(p);
+                            PluginUtils.unload(p);
+                        }
+                    }
+
+                    org.bukkit.plugin.Plugin plugin = null;
+                    try {
+                        plugin = Bukkit.getPluginManager().loadPlugin(finalF);
+                    } catch (InvalidPluginException e) {
+                        throw new RuntimeException(e);
+                    } catch (InvalidDescriptionException e) {
+                        throw new RuntimeException(e);
+                    }
+                    plugin.onLoad();
+                    Bukkit.getPluginManager().enablePlugin(plugin);
                 }
-            }
+            }.runTask(Main.getInstance());
 
-            org.bukkit.plugin.Plugin plugin = Bukkit.getPluginManager().loadPlugin(f);
-            plugin.onLoad();
-            Bukkit.getPluginManager().enablePlugin(plugin);
         }
 
         public boolean canBuild(String player, boolean isOp) {
