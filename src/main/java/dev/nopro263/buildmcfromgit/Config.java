@@ -3,6 +3,8 @@ package dev.nopro263.buildmcfromgit;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.shared.invoker.*;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.InvalidDescriptionException;
@@ -29,6 +31,8 @@ import java.util.logging.LogRecord;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static dev.nopro263.buildmcfromgit.PluginUtils.ansiToChatColor;
 
 public class Config {
     private YamlConfiguration configuration;
@@ -118,7 +122,7 @@ public class Config {
             this.branch = branch;
         }
 
-        private File _build(File result) throws IOException {
+        private File _build(File result, CommandSender sender) throws IOException {
             String current_directory = "/tmp/buildMcFromGit";
             String compressed_file = current_directory + "/latest.tar.gz";
 
@@ -136,6 +140,7 @@ public class Config {
 
             ReadableByteChannel rbc = Channels.newChannel(urlConnection.getInputStream());
             if(((HttpURLConnection) urlConnection).getResponseCode() != 200) {
+                FileUtils.deleteDirectory(cd);
                 throw new RuntimeException("non 200 code received (" + ((HttpURLConnection) urlConnection).getResponseCode() + ")");
             }
             FileOutputStream fos = new FileOutputStream(compressed_file);
@@ -144,18 +149,22 @@ public class Config {
             try {
                 decompress(compressed_file, cd);
             } catch (InterruptedException e) {
+                FileUtils.deleteDirectory(cd);
                 throw new RuntimeException(e);
             }
 
             File[] files = cd.listFiles(new Filter());
 
             if(files == null || files.length == 0) {
+                FileUtils.deleteDirectory(cd);
                 throw new RuntimeException("No file found");
             }
             File file = files[0];
 
             InvocationRequest request = new DefaultInvocationRequest();
             request.setQuiet(true);
+            request.setOutputHandler(s -> sender.sendMessage(ansiToChatColor(s)));
+            request.setErrorHandler(s -> sender.sendMessage(ansiToChatColor(s)));
             request.setPomFile( new File( file.getAbsolutePath() + "/pom.xml" ) );
             request.setGoals( Arrays.asList( "package" ) );
 
@@ -163,12 +172,14 @@ public class Config {
             try {
                 invoker.execute( request );
             } catch (MavenInvocationException e) {
+                FileUtils.deleteDirectory(cd);
                 throw new RuntimeException(e);
             }
 
             File target = new File(file, "target");
             files = target.listFiles(new ResultFilter());
             if(files == null || files.length == 0) {
+                FileUtils.deleteDirectory(cd);
                 throw new RuntimeException("No file found");
             }
             file = files[0];
@@ -188,12 +199,12 @@ public class Config {
             p.waitFor();
         }
 
-        public void build() throws InvalidPluginException, InvalidDescriptionException {
+        public void build(CommandSender sender) throws InvalidPluginException, InvalidDescriptionException {
             File data_dir = Config.this.data_folder;
             PluginLoader loader = Config.this.loader;
             File f = null;
             try {
-                f = this._build(data_dir.getParentFile());
+                f = this._build(data_dir.getParentFile(), sender);
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }

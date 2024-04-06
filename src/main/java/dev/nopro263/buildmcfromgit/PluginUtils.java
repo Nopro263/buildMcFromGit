@@ -2,6 +2,7 @@ package dev.nopro263.buildmcfromgit;
 
 import jdk.internal.event.Event;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.SimpleCommandMap;
@@ -20,6 +21,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class PluginUtils {
+
+    public static String ansiToChatColor(String s) {
+        String ESC = String.valueOf((char) 0x1b);
+
+        s = s.replace(ESC + "[1;31m", ChatColor.BOLD + ChatColor.RED.toString());
+        s = s.replace(ESC + "[m", ChatColor.RESET.toString());
+        s = s.replace(ESC + "[1m", ChatColor.BOLD.toString());
+        s = s.replace(ESC + "[32m", ChatColor.GREEN.toString());
+        s = s.replace(ESC + "[36m", ChatColor.AQUA.toString());
+        return s;
+    }
 
     /*
     * copied from https://github.com/ryan-clancy/PlugMan

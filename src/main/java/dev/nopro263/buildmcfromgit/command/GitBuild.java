@@ -28,9 +28,10 @@ public class GitBuild implements CommandExecutor {
 
         if(canBuild) {
             try {
-                plugin.build();
+                plugin.build(commandSender);
+                commandSender.sendMessage(ChatColor.GREEN + "Built '" + strings[0] + "' successfully");
             } catch (InvalidPluginException | InvalidDescriptionException | RuntimeException e) {
-                commandSender.sendMessage(ChatColor.RED + "Internal error");
+                commandSender.sendMessage(ChatColor.RED + "Building '" + strings[0] + "' failed:");
                 commandSender.sendMessage(e.getMessage());
                 e.printStackTrace();
             }
